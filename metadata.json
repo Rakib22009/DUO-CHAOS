@@ -1,0 +1,6 @@
+{
+  "name": "TWO TOGETHER: DUO CHAOS",
+  "description": "A first-person 3D online cooperative physics obstacle game for two players, powered by Three.js, WebSockets, Firebase, Gemini AI, and Google Tasks.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,229 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Persistent player identity, 3D avatar customization, and cooperative statistics.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24,
+          "description": "Public display name in lobby and gameplay"
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "Avatar image URL"
+        },
+        "characterId": {
+          "type": "string",
+          "enum": ["ranger", "botanist", "mountaineer", "engineer"],
+          "maxLength": 32
+        },
+        "outfitId": {
+          "type": "string",
+          "enum": ["trail", "alpine", "scout", "parka"],
+          "maxLength": 32
+        },
+        "colorHex": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "maxLength": 7
+        },
+        "gamesPlayed": {
+          "type": "integer"
+        },
+        "wins": {
+          "type": "integer"
+        },
+        "failures": {
+          "type": "integer"
+        },
+        "bestLevel": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "username",
+        "photoURL",
+        "characterId",
+        "outfitId",
+        "colorHex",
+        "gamesPlayed",
+        "wins",
+        "failures",
+        "bestLevel",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GameRoom": {
+      "title": "GameRoom",
+      "description": "Two-player cooperative match room metadata and checkpoint progression.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{6}$",
+          "minLength": 6,
+          "maxLength": 6
+        },
+        "hostUid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "hostName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "guestUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "guestName": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "roomStatus": {
+          "type": "string",
+          "enum": ["waiting", "playing", "completed"],
+          "maxLength": 16
+        },
+        "selectedObject": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "courseTheme": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "currentLevel": {
+          "type": "integer"
+        },
+        "currentCheckpoint": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "roomId",
+        "hostUid",
+        "hostName",
+        "guestUid",
+        "guestName",
+        "isPublic",
+        "roomStatus",
+        "selectedObject",
+        "courseTheme",
+        "currentLevel",
+        "currentCheckpoint",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MatchRecord": {
+      "title": "MatchRecord",
+      "description": "Immutable completed co-op run record.",
+      "type": "object",
+      "properties": {
+        "matchId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "roomId": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{6}$",
+          "maxLength": 6
+        },
+        "hostUid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "guestUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "objectType": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "courseTheme": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["victory", "abandoned", "failed"],
+          "maxLength": 16
+        },
+        "durationSec": {
+          "type": "number"
+        },
+        "checkpointsReached": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "matchId",
+        "roomId",
+        "hostUid",
+        "guestUid",
+        "objectType",
+        "courseTheme",
+        "outcome",
+        "durationSec",
+        "checkpointsReached",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Player profile and lifetime co-op statistics keyed by Firebase Auth UID."
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/GameRoom" },
+      "description": "Two-player room directory for Create Room, Join Room, and Random Matchmaking."
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/MatchRecord" },
+      "description": "Immutable completed co-op match history records."
+    }
+  }
+}

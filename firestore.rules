@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidRoomCode(id) {
+      return id is string && id.size() == 6 && id.matches('^[A-Z0-9]{6}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+        'uid', 'username', 'photoURL', 'characterId', 'outfitId',
+        'colorHex', 'gamesPlayed', 'wins', 'failures', 'bestLevel',
+        'createdAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'uid', 'username', 'photoURL', 'characterId', 'outfitId',
+        'colorHex', 'gamesPlayed', 'wins', 'failures', 'bestLevel',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.username is string && data.username.size() >= 2 && data.username.size() <= 24 &&
+      data.photoURL is string && data.photoURL.size() <= 512 &&
+      data.characterId in ['ranger', 'botanist', 'mountaineer', 'engineer'] &&
+      data.outfitId in ['trail', 'alpine', 'scout', 'parka'] &&
+      data.colorHex is string && data.colorHex.size() == 7 && data.colorHex.matches('^#[0-9a-fA-F]{6}$') &&
+      data.gamesPlayed is int && data.gamesPlayed >= 0 && data.gamesPlayed <= 1000000 &&
+      data.wins is int && data.wins >= 0 && data.wins <= 1000000 &&
+      data.failures is int && data.failures >= 0 && data.failures <= 1000000 &&
+      data.bestLevel is int && data.bestLevel >= 0 && data.bestLevel <= 100 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidGameRoom(data) {
+      return data.keys().hasAll([
+        'roomId', 'hostUid', 'hostName', 'guestUid', 'guestName',
+        'isPublic', 'roomStatus', 'selectedObject', 'courseTheme',
+        'currentLevel', 'currentCheckpoint', 'createdAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'roomId', 'hostUid', 'hostName', 'guestUid', 'guestName',
+        'isPublic', 'roomStatus', 'selectedObject', 'courseTheme',
+        'currentLevel', 'currentCheckpoint', 'createdAt', 'updatedAt'
+      ]) &&
+      isValidRoomCode(data.roomId) &&
+      isValidId(data.hostUid) &&
+      data.hostName is string && data.hostName.size() >= 1 && data.hostName.size() <= 24 &&
+      data.guestUid is string && data.guestUid.size() <= 128 &&
+      data.guestName is string && data.guestName.size() <= 24 &&
+      data.isPublic is bool &&
+      data.roomStatus in ['waiting', 'playing', 'completed'] &&
+      data.selectedObject is string && data.selectedObject.size() >= 1 && data.selectedObject.size() <= 32 &&
+      data.courseTheme is string && data.courseTheme.size() >= 1 && data.courseTheme.size() <= 64 &&
+      data.currentLevel is int && data.currentLevel >= 1 && data.currentLevel <= 50 &&
+      data.currentCheckpoint is int && data.currentCheckpoint >= 0 && data.currentCheckpoint <= 10 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidMatchRecord(data) {
+      return data.keys().hasAll([
+        'matchId', 'roomId', 'hostUid', 'guestUid', 'objectType',
+        'courseTheme', 'outcome', 'durationSec', 'checkpointsReached', 'createdAt'
+      ]) && data.keys().hasOnly([
+        'matchId', 'roomId', 'hostUid', 'guestUid', 'objectType',
+        'courseTheme', 'outcome', 'durationSec', 'checkpointsReached', 'createdAt'
+      ]) &&
+      isValidId(data.matchId) &&
+      isValidRoomCode(data.roomId) &&
+      isValidId(data.hostUid) &&
+      data.guestUid is string && data.guestUid.size() <= 128 &&
+      data.objectType is string && data.objectType.size() >= 1 && data.objectType.size() <= 32 &&
+      data.courseTheme is string && data.courseTheme.size() >= 1 && data.courseTheme.size() <= 64 &&
+      data.outcome in ['victory', 'abandoned', 'failed'] &&
+      data.durationSec is number && data.durationSec >= 0 && data.durationSec <= 86400 &&
+      data.checkpointsReached is int && data.checkpointsReached >= 0 && data.checkpointsReached <= 10 &&
+      data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'photoURL', 'characterId', 'outfitId',
+          'colorHex', 'gamesPlayed', 'wins', 'failures', 'bestLevel', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    match /rooms/{roomId} {
+      allow get: if isSignedIn() && isValidRoomCode(roomId) && (
+        resource.data.hostUid == request.auth.uid ||
+        resource.data.guestUid == request.auth.uid ||
+        (resource.data.roomStatus == 'waiting' && resource.data.guestUid == '')
+      );
+      allow list: if isSignedIn() && (
+        (resource.data.isPublic == true && resource.data.roomStatus == 'waiting') ||
+        resource.data.hostUid == request.auth.uid ||
+        resource.data.guestUid == request.auth.uid
+      );
+      allow create: if isVerifiedUser()
+        && isValidRoomCode(roomId)
+        && isValidGameRoom(incoming())
+        && incoming().roomId == roomId
+        && incoming().hostUid == request.auth.uid
+        && incoming().guestUid == ''
+        && incoming().roomStatus == 'waiting'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidRoomCode(roomId)
+        && isValidGameRoom(incoming())
+        && existing().roomStatus != 'completed'
+        && incoming().roomId == existing().roomId
+        && incoming().hostUid == existing().hostUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Guest joins open waiting slot
+          (
+            existing().roomStatus == 'waiting' &&
+            existing().guestUid == '' &&
+            request.auth.uid != existing().hostUid &&
+            incoming().guestUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['guestUid', 'guestName', 'updatedAt'])
+          ) ||
+          // Action: Guest leaves waiting room
+          (
+            existing().roomStatus == 'waiting' &&
+            existing().guestUid == request.auth.uid &&
+            incoming().guestUid == '' &&
+            incoming().guestName == '' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['guestUid', 'guestName', 'updatedAt'])
+          ) ||
+          // Action: Host updates match progress or completes room
+          (
+            existing().hostUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'roomStatus', 'selectedObject', 'courseTheme',
+              'currentLevel', 'currentCheckpoint', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isVerifiedUser()
+        && isValidRoomCode(roomId)
+        && resource.data.hostUid == request.auth.uid;
+    }
+
+    match /matches/{matchId} {
+      allow get: if isSignedIn() && isValidId(matchId) && (
+        resource.data.hostUid == request.auth.uid ||
+        resource.data.guestUid == request.auth.uid
+      );
+      allow list: if isSignedIn() && (
+        resource.data.hostUid == request.auth.uid ||
+        resource.data.guestUid == request.auth.uid
+      );
+      allow create: if isVerifiedUser()
+        && isValidId(matchId)
+        && isValidMatchRecord(incoming())
+        && incoming().matchId == matchId
+        && incoming().hostUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/rooms/$(incoming().roomId));
+      allow update, delete: if false;
+    }
+  }
+}
